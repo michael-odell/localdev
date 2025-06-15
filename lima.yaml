@@ -1,0 +1,145 @@
+# docs: https://lima-vm.io/docs/config/
+# defaults: https://github.com/lima-vm/lima/blob/master/templates/default.yaml
+
+vmType: vz
+arch: aarch64
+
+images:
+- location: "https://cloud-images.ubuntu.com/releases/oracular/release-20250502/ubuntu-24.10-server-cloudimg-arm64.img"
+  arch: "aarch64"
+  digest: "sha256:ed3eb300e553f30b6d7ba5a18c9c654848e706e9701eb904e46a374f204d2e89"
+
+
+cpus: 10
+memory: 10GiB
+disk: 200GiB
+
+mounts:
+- location: "~"
+
+- location: "{{.GlobalTempDir}}/lima"
+  mountPoint: /tmp/lima
+  writable: true
+#- location: "~"
+#  # Configure the mountPoint inside the guest.
+#  # 🟢 Builtin default: value of location
+#  mountPoint: null
+#  # Setting `writable` to true is discouraged when mountType is set to "reverse-sshfs".
+#  # 🟢 Builtin default: false
+#  writable: null
+#  sshfs:
+#    # Enabling the SSHFS cache will increase performance of the mounted filesystem, at
+#    # the cost of potentially not reflecting changes made on the host in a timely manner.
+#    # Warning: It looks like PHP filesystem access does not work correctly when
+#    # the cache is disabled.
+#    # 🟢 Builtin default: true
+#    cache: null
+#    # SSHFS has an optional flag called 'follow_symlinks'. This allows mounts
+#    # to be properly resolved in the guest os and allow for access to the
+#    # contents of the symlink. As a result, symlinked files & folders on the Host
+#    # system will look and feel like regular files directories in the Guest OS.
+#    # 🟢 Builtin default: false
+#    followSymlinks: null
+#    # SFTP driver, "builtin" or "openssh-sftp-server". "openssh-sftp-server" is recommended.
+#    # 🟢 Builtin default: "openssh-sftp-server" if OpenSSH SFTP Server binary is found, otherwise "builtin"
+#    sftpDriver: null
+#  9p:
+#    # Supported security models are "passthrough", "mapped-xattr", "mapped-file" and "none".
+#    # "mapped-xattr" and "mapped-file" are useful for persistent chown but incompatible with symlinks.
+#    # 🟢 Builtin default: "none" (since Lima v0.13)
+#    securityModel: null
+#    # Select 9P protocol version. Valid options are: "9p2000" (legacy), "9p2000.u", "9p2000.L".
+#    # 🟢 Builtin default: "9p2000.L"
+#    protocolVersion: null
+#    # The number of bytes to use for 9p packet payload, where 4KiB is the absolute minimum.
+#    # 🟢 Builtin default: "128KiB"
+#    msize: null
+#    # Specifies a caching policy. Valid options are: "none", "loose", "fscache" and "mmap".
+#    # Try choosing "mmap" or "none" if you see a stability issue with the default "fscache".
+#    # See https://www.kernel.org/doc/Documentation/filesystems/9p.txt
+#    # 🟢 Builtin default: "fscache" for non-writable mounts, "mmap" for writable mounts
+#    cache: null
+#- location: "/tmp/lima"
+#  # 🟢 Builtin default: false
+#  # 🔵 This file: true (only for "/tmp/lima")
+#  writable: true
+
+mountType: virtiofs
+mountInotify: null
+
+upgradePackages: null
+
+containerd:
+  system: null
+  user: null
+
+minimumLimaVersion: 1.1.0
+
+# User to be used inside the VM
+user:
+  name: null
+  comment: null
+  uid: null
+  home: null
+  shell: null
+
+#vmOpts:
+#  qemu:
+#    # Minimum version of QEMU required to create an instance of this template.
+#    # Will be ignored if the vmType is not "qemu"
+#    # 🟢 Builtin default: not set
+#    minimumVersion: null
+
+# OS: "Linux".
+# 🟢 Builtin default: "Linux"
+os: null
+
+# Specify desired QEMU CPU type for each arch.
+# You can see what options are available for host emulation with: `qemu-system-$(arch) -cpu help`.
+# Setting of instructions is supported like this: "qemu64,+ssse3".
+# 🟢 Builtin default: hard-coded arch map with type (see the output of `limactl info | jq .defaultTemplate.cpuType`)
+cpuType:
+#   aarch64: "max" # (or "host" when running on aarch64 host)
+#   armv7l:  "max" # (or "host" when running on armv7l host)
+#   riscv64: "max" # (or "host" when running on riscv64 host)
+#   x86_64:  "max" # (or "host" when running on x86_64 host; additional options are appended on Intel Mac)
+
+rosetta:
+  enabled: true
+  binfmt: true
+
+timezone: null
+
+firmware:
+  legacyBIOS: null
+
+audio:
+  device: none
+
+video:
+  display: none
+  vnc:
+    display: null
+
+# The instance can get routable IP addresses from the vmnet framework using
+# https://github.com/lima-vm/socket_vmnet.
+# 🟢 Builtin default: []
+networks: []
+propagateProxyEnv: false
+
+hostResolver:
+  enabled: true
+  ipv6: false
+
+  # Static names can be defined here as an alternative to adding them to the hosts /etc/hosts.
+  # Values can be either other hostnames, or IP addresses. The host.lima.internal name is
+  # predefined to specify the gateway address to the host.
+  # 🟢 Builtin default: {}
+  hosts:
+  #   guest.name: 127.1.1.1
+  #   host.name: host.lima.internal
+
+
+# NOTE: requires M3
+nestedVirtualization: false
+

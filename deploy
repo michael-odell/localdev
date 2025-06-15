@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+require_tool() {
+    if ! which $1 &>/dev/null ; then
+        echo "Unable to find required tool ($1) on path." >&2
+        exit 1
+    fi
+}
+
+require_tool limactl
+require_tool kind
+
+LIMA_VM=localdev
+LIMA_DIR=$HOME/.lima/${LIMA_VM}
+
+if [[ ! -d ~/.lima/localdev ]] ; then
+    mkdir -p "${LIMA_DIR}"
+    cp lima.yaml "${LIMA_DIR}/lima.yaml"
+fi
+
+limactl start localdev
