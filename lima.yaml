@@ -1,18 +1,118 @@
-# docs: https://lima-vm.io/docs/config/
-# defaults: https://github.com/lima-vm/lima/blob/master/templates/default.yaml
+# A template to use Docker instead of containerd & nerdctl
+# $ limactl start ./docker.yaml
+# $ limactl shell docker docker run -it -v $HOME:$HOME --rm alpine
+
+# To run `docker` on the host (assumes docker-cli is installed):
+# $ export DOCKER_HOST=$(limactl list docker --format 'unix://{{.Dir}}/sock/docker.sock')
+# $ docker ...
+
+minimumLimaVersion: 1.1.0
 
 vmType: vz
 arch: aarch64
-
-images:
-- location: "https://cloud-images.ubuntu.com/releases/oracular/release-20250502/ubuntu-24.10-server-cloudimg-arm64.img"
-  arch: "aarch64"
-  digest: "sha256:ed3eb300e553f30b6d7ba5a18c9c654848e706e9701eb904e46a374f204d2e89"
-
-
 cpus: 10
 memory: 10GiB
 disk: 200GiB
+mountType: virtiofs
+mountInotify: null
+rosetta:
+  enabled: true
+  binfmt: true
+
+
+# containerd is managed by Docker, not by Lima, so the values are set to false here.
+containerd:
+  system: false
+  user: false
+provision:
+- mode: system
+  # This script defines the host.docker.internal hostname when hostResolver is disabled.
+  # It is also needed for lima 0.8.2 and earlier, which does not support hostResolver.hosts.
+  # Names defined in /etc/hosts inside the VM are not resolved inside containers when
+  # using the hostResolver; use hostResolver.hosts instead (requires lima 0.8.3 or later).
+  script: |
+    #!/bin/sh
+    sed -i 's/host.lima.internal.*/host.lima.internal host.docker.internal/' /etc/hosts
+- mode: system
+  script: |
+    #!/bin/bash
+    set -eux -o pipefail
+    command -v docker >/dev/null 2>&1 && exit 0
+    export DEBIAN_FRONTEND=noninteractive
+    curl -fsSL https://get.docker.com | sh
+    # NOTE: you may remove the lines below, if you prefer to use rootful docker, not rootless
+    systemctl disable --now docker
+    apt-get install -y uidmap dbus-user-session
+- mode: user
+  script: |
+    #!/bin/bash
+    set -eux -o pipefail
+    systemctl --user start dbus
+    dockerd-rootless-setuptool.sh install
+    docker context use rootless
+probes:
+- script: |
+    #!/bin/bash
+    set -eux -o pipefail
+    if ! timeout 30s bash -c "until command -v docker >/dev/null 2>&1; do sleep 3; done"; then
+      echo >&2 "docker is not installed yet"
+      exit 1
+    fi
+    if ! timeout 30s bash -c "until pgrep rootlesskit; do sleep 3; done"; then
+      echo >&2 "rootlesskit (used by rootless docker) is not running"
+      exit 1
+    fi
+  hint: See "/var/log/cloud-init-output.log" in the guest
+hostResolver:
+  # hostResolver.hosts requires lima 0.8.3 or later. Names defined here will also
+  # resolve inside containers, and not just inside the VM itself.
+  hosts:
+    host.docker.internal: host.lima.internal
+portForwards:
+- guestSocket: "/run/user/{{.UID}}/docker.sock"
+  hostSocket: "{{.Dir}}/sock/docker.sock"
+
+images:
+# Try to use release-yyyyMMdd image if available. Note that release-yyyyMMdd will be removed after several months.
+
+- location: "https://cloud-images.ubuntu.com/releases/noble/release-20250516/ubuntu-24.04-server-cloudimg-amd64.img"
+  arch: "x86_64"
+  digest: "sha256:8d6161defd323d24d66f85dda40e64e2b9021aefa4ca879dcbc4ec775ad1bbc5"
+- location: "https://cloud-images.ubuntu.com/releases/noble/release-20250516/ubuntu-24.04-server-cloudimg-arm64.img"
+  arch: "aarch64"
+  digest: "sha256:c933c6932615d26c15f6e408e4b4f8c43cb3e1f73b0a98c2efa916cc9ab9549c"
+- location: "https://cloud-images.ubuntu.com/releases/noble/release-20250516/ubuntu-24.04-server-cloudimg-riscv64.img"
+  arch: "riscv64"
+  digest: "sha256:8b7f41b6530609a5cb1c4ec21b1993e6e80985e5c9c2b13d43dad95bc58afb94"
+- location: "https://cloud-images.ubuntu.com/releases/noble/release-20250516/ubuntu-24.04-server-cloudimg-armhf.img"
+  arch: "armv7l"
+  digest: "sha256:c9a9c7d6cd680b4faf8421da78e64aab7a3d024e86d48e57472fe74a4f45343e"
+- location: "https://cloud-images.ubuntu.com/releases/noble/release-20250516/ubuntu-24.04-server-cloudimg-s390x.img"
+  arch: "s390x"
+  digest: "sha256:ecf500c278ed43dddc80edaa68f24e4e8bbe7e715169f97347b82991054ddbea"
+- location: "https://cloud-images.ubuntu.com/releases/noble/release-20250516/ubuntu-24.04-server-cloudimg-ppc64el.img"
+  arch: "ppc64le"
+  digest: "sha256:11fc8af103fa6ae0f9b250e7929bf6fba15cb9fb3434108f699569e918c8eba5"
+# Fallback to the latest release image.
+# Hint: run `limactl prune` to invalidate the cache
+
+- location: https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img
+  arch: x86_64
+
+- location: https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-arm64.img
+  arch: aarch64
+
+- location: https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-riscv64.img
+  arch: riscv64
+
+- location: https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-armhf.img
+  arch: armv7l
+
+- location: https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-s390x.img
+  arch: s390x
+
+- location: https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-ppc64el.img
+  arch: ppc64le
 
 mounts:
 - location: "~"
@@ -20,126 +120,3 @@ mounts:
 - location: "{{.GlobalTempDir}}/lima"
   mountPoint: /tmp/lima
   writable: true
-#- location: "~"
-#  # Configure the mountPoint inside the guest.
-#  # 🟢 Builtin default: value of location
-#  mountPoint: null
-#  # Setting `writable` to true is discouraged when mountType is set to "reverse-sshfs".
-#  # 🟢 Builtin default: false
-#  writable: null
-#  sshfs:
-#    # Enabling the SSHFS cache will increase performance of the mounted filesystem, at
-#    # the cost of potentially not reflecting changes made on the host in a timely manner.
-#    # Warning: It looks like PHP filesystem access does not work correctly when
-#    # the cache is disabled.
-#    # 🟢 Builtin default: true
-#    cache: null
-#    # SSHFS has an optional flag called 'follow_symlinks'. This allows mounts
-#    # to be properly resolved in the guest os and allow for access to the
-#    # contents of the symlink. As a result, symlinked files & folders on the Host
-#    # system will look and feel like regular files directories in the Guest OS.
-#    # 🟢 Builtin default: false
-#    followSymlinks: null
-#    # SFTP driver, "builtin" or "openssh-sftp-server". "openssh-sftp-server" is recommended.
-#    # 🟢 Builtin default: "openssh-sftp-server" if OpenSSH SFTP Server binary is found, otherwise "builtin"
-#    sftpDriver: null
-#  9p:
-#    # Supported security models are "passthrough", "mapped-xattr", "mapped-file" and "none".
-#    # "mapped-xattr" and "mapped-file" are useful for persistent chown but incompatible with symlinks.
-#    # 🟢 Builtin default: "none" (since Lima v0.13)
-#    securityModel: null
-#    # Select 9P protocol version. Valid options are: "9p2000" (legacy), "9p2000.u", "9p2000.L".
-#    # 🟢 Builtin default: "9p2000.L"
-#    protocolVersion: null
-#    # The number of bytes to use for 9p packet payload, where 4KiB is the absolute minimum.
-#    # 🟢 Builtin default: "128KiB"
-#    msize: null
-#    # Specifies a caching policy. Valid options are: "none", "loose", "fscache" and "mmap".
-#    # Try choosing "mmap" or "none" if you see a stability issue with the default "fscache".
-#    # See https://www.kernel.org/doc/Documentation/filesystems/9p.txt
-#    # 🟢 Builtin default: "fscache" for non-writable mounts, "mmap" for writable mounts
-#    cache: null
-#- location: "/tmp/lima"
-#  # 🟢 Builtin default: false
-#  # 🔵 This file: true (only for "/tmp/lima")
-#  writable: true
-
-mountType: virtiofs
-mountInotify: null
-
-upgradePackages: null
-
-containerd:
-  system: null
-  user: null
-
-minimumLimaVersion: 1.1.0
-
-# User to be used inside the VM
-user:
-  name: null
-  comment: null
-  uid: null
-  home: null
-  shell: null
-
-#vmOpts:
-#  qemu:
-#    # Minimum version of QEMU required to create an instance of this template.
-#    # Will be ignored if the vmType is not "qemu"
-#    # 🟢 Builtin default: not set
-#    minimumVersion: null
-
-# OS: "Linux".
-# 🟢 Builtin default: "Linux"
-os: null
-
-# Specify desired QEMU CPU type for each arch.
-# You can see what options are available for host emulation with: `qemu-system-$(arch) -cpu help`.
-# Setting of instructions is supported like this: "qemu64,+ssse3".
-# 🟢 Builtin default: hard-coded arch map with type (see the output of `limactl info | jq .defaultTemplate.cpuType`)
-cpuType:
-#   aarch64: "max" # (or "host" when running on aarch64 host)
-#   armv7l:  "max" # (or "host" when running on armv7l host)
-#   riscv64: "max" # (or "host" when running on riscv64 host)
-#   x86_64:  "max" # (or "host" when running on x86_64 host; additional options are appended on Intel Mac)
-
-rosetta:
-  enabled: true
-  binfmt: true
-
-timezone: null
-
-firmware:
-  legacyBIOS: null
-
-audio:
-  device: none
-
-video:
-  display: none
-  vnc:
-    display: null
-
-# The instance can get routable IP addresses from the vmnet framework using
-# https://github.com/lima-vm/socket_vmnet.
-# 🟢 Builtin default: []
-networks: []
-propagateProxyEnv: false
-
-hostResolver:
-  enabled: true
-  ipv6: false
-
-  # Static names can be defined here as an alternative to adding them to the hosts /etc/hosts.
-  # Values can be either other hostnames, or IP addresses. The host.lima.internal name is
-  # predefined to specify the gateway address to the host.
-  # 🟢 Builtin default: {}
-  hosts:
-  #   guest.name: 127.1.1.1
-  #   host.name: host.lima.internal
-
-
-# NOTE: requires M3
-nestedVirtualization: false
-

@@ -23,3 +23,8 @@ if [[ ! -d ~/.lima/localdev ]] ; then
 fi
 
 limactl start localdev
+
+docker context rm -f lima-localdev
+docker context create lima-localdev --docker "host=unix:///Users/michael/.lima/localdev/sock/docker.sock"
+docker context use lima-localdev
+
