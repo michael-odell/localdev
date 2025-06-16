@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+require_tool() {
+    if ! which $1 &>/dev/null ; then
+        echo "Unable to find required tool ($1) on path." >&2
+        exit 1
+    fi
+}
+
+require_tool limactl
+require_tool kind
+
+LIMA_VM=localdev
+LIMA_DIR=$HOME/.lima/${LIMA_VM}
+
+if [[ ! -d ~/.lima/localdev ]] ; then
+    mkdir -p "${LIMA_DIR}"
+    cp lima.yaml "${LIMA_DIR}/lima.yaml"
+fi
+
+# Pipe to cat so it doesn't think it has a terminal.  Otherwise limactl screws up my terminal profile
+# every time
+limactl start localdev | cat
+
+docker context rm -f lima-localdev
+docker context create lima-localdev --docker "host=unix:///Users/michael/.lima/localdev/sock/docker.sock"
+docker context use lima-localdev
+
+if ! kind get clusters | grep localdev ; then
+    kind create cluster \
+        --config kind-cluster-localdev.yaml \
+        --name localdev
+fi
+
+#kind create cluster --config YAML_FILE --name localdev
+
+kind export kubeconfig \
+    --name localdev \
+    --kubeconfig $HOME/.kube/config.localdev
+
+helm upgrade --install \
+    ingress-nginx ingress-nginx \
+    --repo https://kubernetes.github.io/ingress-nginx \
+    --namespace ingress \
+    --create-namespace \
+    --values ingress-nginx.yaml
+
