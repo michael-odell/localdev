@@ -2,5 +2,5 @@
 
 set -euo pipefail
 
-limactl stop localdev
+limactl stop -f localdev
 limactl delete localdev

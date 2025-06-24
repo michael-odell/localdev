@@ -1,0 +1,74 @@
+# ref: https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml
+#
+
+alertmanager:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    pathType: Prefix
+    hosts:
+      - localdev
+    paths:
+      - /alertmanager
+
+  alertmanagerSpec:
+    externalUrl: "http://localdev/alertmanager"
+    routePrefix: "/alertmanager/"
+
+grafana:
+  enabled: true
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    pathType: Prefix
+    hosts:
+      - localdev
+    paths:
+      "/grafana"
+
+  admin:
+    existingSecret: "grafana-login"
+    userKey: username
+    passwordKey: password
+
+  grafana.ini:
+    server:
+      domain: localdev
+      root_url: "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
+      serve_from_sub_path: true
+      enable_gzip: true
+
+    analytics:
+      check_for_updates: false
+
+    sidecar:
+      dashboards:
+        searchNamespace: ALL
+        provider:
+          allowUiUpdates: true
+
+prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - localdev
+    paths:
+      - /prometheus
+
+  prometheusSpec:
+    # Allow any of these from different namespaces including those not installed inside this helm chart
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    replicas: 1
+
+    externalUrl: "http://localdev/prometheus/"
+    routePrefix: "/prometheus/"
+
+    retentionSize: 10GB
+    walCompression: true
+
+
